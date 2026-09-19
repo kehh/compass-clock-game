@@ -171,6 +171,9 @@
                     <input type="number" id="numSheets" value="3" min="1" max="10">
                 </div>
                 <div class="form-group">
+                    <label><input type="checkbox" id="splitWordsAcrossSheets"> Split words across sheets (each sheet gets different words)</label>
+                </div>
+                <div class="form-group">
                     <label for="wordList">Target Words (one per line or comma separated):</label>
                     <textarea id="wordList">ROLEY
 BRAVO
@@ -234,6 +237,7 @@ BUSHWALK</textarea>
         const numCones = parseInt(document.getElementById('numCones').value);
         const numSheets = parseInt(document.getElementById('numSheets').value) || 3;
         const rawWords = document.getElementById('wordList').value;
+        const splitWords = document.getElementById('splitWordsAcrossSheets').checked;
         const randomize = document.getElementById('randomizeCones').checked;
         let customLettersInput = document.getElementById('customLetters').value.toUpperCase().replace(/[^A-Z]/g, '');
 
@@ -335,10 +339,12 @@ BUSHWALK</textarea>
         });
 
         let quizSheetsHTML = '';
-        for (let s = 1; s <= numSheets; s++) {
+        const sheetCount = splitWords ? Math.min(numSheets, cardsHTMLList.length) : numSheets;
+        for (let s = 1; s <= sheetCount; s++) {
             quizSheetsHTML += `<div class="quiz-sheet" style="border:2px solid #999; padding:10px; margin-bottom:20px; border-radius:4px;">
-                <h3 style="margin-top:0;">Quiz Sheet ${s} of ${numSheets}</h3>`;
+                <h3 style="margin-top:0;">Quiz Sheet ${s} of ${sheetCount}</h3>`;
             cardsHTMLList.forEach((card, idx) => {
+                if (splitWords && idx % sheetCount !== (s - 1)) return;
                 quizSheetsHTML += `<div class="quiz-card" style="border:1px solid #ccc; padding:10px; margin-bottom:10px; border-radius:4px; background:#fff;">
                     <strong>Card ${idx + 1}</strong><br>
                     <strong>Bearings:</strong> ${card.bearingsArr.join(' — ')}<br>

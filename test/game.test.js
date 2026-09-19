@@ -20,7 +20,7 @@ before(() => {
 
   const ids = [
     'numCones', 'wordList', 'customLetters', 'randomizeCones',
-    'numSheets', 'errorBox', 'angleSpacing', 'coneTableContainer',
+    'numSheets', 'splitWordsAcrossSheets', 'errorBox', 'angleSpacing', 'coneTableContainer',
     'gameCardsContainer', 'gameCardsContainer', 'quizSheetsContainer',
     'solutionsContainer', 'outputSection',
   ];
@@ -42,6 +42,7 @@ function setup(opts = {}) {
   elements.customLetters.value = opts.customLetters || '';
   elements.randomizeCones.checked = opts.randomize !== false;
   elements.numSheets.value = opts.numSheets || '3';
+  elements.splitWordsAcrossSheets.checked = opts.split === true;
   elements.errorBox.style.display = 'none';
   elements.errorBox.innerHTML = '';
   elements.outputSection.style.display = 'none';
@@ -49,6 +50,26 @@ function setup(opts = {}) {
 
 function count(haystack, subject) {
   return (haystack.split(subject).length - 1);
+}
+
+function cardBearingKey(html) {
+  return (html.match(/\d{3}°/g) || []).join(' ');
+}
+
+function solutionMap(solHTML) {
+  const map = {};
+  for (const seg of solHTML.split('<div class="solution-card"').slice(1)) {
+    const word = (seg.match(/Card \d+:\s*([A-Z]+)/) || [])[1];
+    const key = cardBearingKey(seg);
+    map[key] = word;
+  }
+  return map;
+}
+
+function sheetWords(sheetsHTML, map) {
+  return sheetsHTML.split('<div class="quiz-sheet"').slice(1).map((seg) =>
+    seg.split('<div class="quiz-card"').slice(1).map((cardHTML) => map[cardBearingKey(cardHTML)])
+  );
 }
 
 test('script parses without SyntaxError', () => {
@@ -143,6 +164,39 @@ test('head declares a compass emoji favicon as an inline SVG data URI', () => {
   assert.ok(match, 'favicon link must be declared in the head');
   assert.ok(match[0].includes('image/svg+xml'), 'favicon must be an SVG data URI');
   assert.ok(match[0].includes(encodeURIComponent('\u{1F9ED}')) || match[0].includes('\u{1F9ED}'), 'favicon must render a compass emoji');
+});
+
+test('split option round-robins words across sheets so no two sheets repeat a word', () => {
+  setup({ numSheets: '3', split: true, randomize: false });
+  generateGame();
+  const quizHTML = elements.quizSheetsContainer.innerHTML;
+  const solHTML = elements.solutionsContainer.innerHTML;
+
+  assert.strictEqual(count(quizHTML, 'class="quiz-sheet"'), 3);
+  assert.strictEqual(count(quizHTML, 'class="quiz-card"'), 15, 'each word appears on exactly one sheet');
+
+  const map = solutionMap(solHTML);
+  const sheets = sheetWords(quizHTML, map);
+
+  const all = sheets.flat();
+  assert.strictEqual(all.length, 15);
+  assert.strictEqual(new Set(all).size, 15, 'no word repeats across sheets');
+
+  const words = DEFAULT_WORDS.split('\n');
+  for (let s = 0; s < 3; s++) {
+    const expected = words.filter((_, i) => i % 3 === s);
+    assert.deepStrictEqual([...sheets[s]].sort(), [...expected].sort(), `sheet ${s + 1} gets round-robin words`);
+  }
+
+  assert.strictEqual(count(solHTML, 'class="solution-card"'), 15, 'solutions still cover all words');
+});
+
+test('split option with more sheets than words caps sheet count at word count', () => {
+  setup({ numSheets: '50', split: true, randomize: false });
+  generateGame();
+  const quizHTML = elements.quizSheetsContainer.innerHTML;
+  assert.strictEqual(count(quizHTML, 'class="quiz-sheet"'), 15, 'no empty sheets rendered');
+  assert.strictEqual(count(quizHTML, 'class="quiz-card"'), 15);
 });
 
 test('36 cones completes without hanging and with no error', () => {

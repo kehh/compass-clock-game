@@ -15,6 +15,7 @@ A patrol stands in the center of the oval. Each quiz card lists the bearings for
 | Number of Cones | 24 | 4 to 36. Each cone gets one letter and one bearing. |
 | Target Words | 15 sample words | One per line or comma separated. Every unique letter across the words needs its own cone. |
 | Number of Quiz Sheets | 3 | How many full copies of the card set to print, one per patrol. |
+| Split Words Across Sheets | off | When on, the words are round-robined across sheets instead of repeated, so each sheet holds a different word set. Sheet count caps at the word count. |
 | Specific Letters to Include | empty | Extra letters to force onto the oval. |
 | Randomize Letter Placement | on | Shuffles which letter sits on which bearing. |
 

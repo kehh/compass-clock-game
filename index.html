@@ -129,6 +129,14 @@
             .no-print {
                 display: none;
             }
+            .print-section + .print-section {
+                break-before: page;
+                page-break-before: always;
+            }
+            .quiz-sheet + .quiz-sheet {
+                break-before: page;
+                page-break-before: always;
+            }
             body {
                 background: none;
                 padding: 0;
@@ -155,7 +163,11 @@
                 <h2>1. Setup Parameters</h2>
                 <div class="form-group">
                     <label for="numCones">Number of Cones:</label>
-                    <input type="number" id="numCones" value="20" min="4" max="36">
+                    <input type="number" id="numCones" value="24" min="4" max="36">
+                </div>
+                <div class="form-group">
+                    <label for="numSheets">Number of Quiz Sheets (copies of full card set):</label>
+                    <input type="number" id="numSheets" value="3" min="1" max="10">
                 </div>
                 <div class="form-group">
                     <label for="wordList">Target Words (one per line or comma separated):</label>
@@ -192,12 +204,21 @@ BUSHWALK</textarea>
     </div>
 
     <div class="output-section" id="outputSection" style="display:none;">
-        <h2>Cone Layout & Letter Assignments</h2>
-        <p>Each cone is spaced <span id="angleSpacing">18</span>° apart around the oval.</p>
-        <div id="coneTableContainer"></div>
+        <div class="print-section">
+            <h2>Cone Layout & Letter Assignments</h2>
+            <p>Each cone is spaced <span id="angleSpacing">18</span>° apart around the oval.</p>
+            <div id="coneTableContainer"></div>
+        </div>
 
-        <h2>Generated Game Cards (Bearings & Solutions)</h2>
-        <div id="gameCardsContainer"></div>
+        <div class="print-section">
+            <h2>Quiz Sheets (scout copies)</h2>
+            <div id="quizSheetsContainer"></div>
+        </div>
+
+        <div class="print-section">
+            <h2>Solutions (leader copy)</h2>
+            <div id="solutionsContainer"></div>
+        </div>
 
         <button class="no-print" style="margin-top: 20px;" onclick="window.print()">🖨️ Print Game Sheets</button>
     </div>
@@ -210,13 +231,13 @@ BUSHWALK</textarea>
         errorBox.innerHTML = '';
 
         const numCones = parseInt(document.getElementById('numCones').value);
+        const numSheets = parseInt(document.getElementById('numSheets').value) || 3;
         const rawWords = document.getElementById('wordList').value;
         const randomize = document.getElementById('randomizeCones').checked;
         let customLettersInput = document.getElementById('customLetters').value.toUpperCase().replace(/[^A-Z]/g, '');
 
         // Parse words
-        const words = rawWords.split(/[
-,]+/).map(w => w.trim().toUpperCase().replace(/[^A-Z]/g, '')).filter(w => w.length > 0);
+        const words = rawWords.split(/[,\r\n]+/).map(w => w.trim().toUpperCase().replace(/[^A-Z]/g, '')).filter(w => w.length > 0);
 
         if (words.length === 0) {
             showError("Please enter at least one valid word.");
@@ -244,13 +265,15 @@ BUSHWALK</textarea>
 
         // Fill remaining cone slots with extra letters if needed
         const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-        let fillIdx = 0;
-        while (requiredLetters.length < numCones) {
-            let extraChar = alphabet[fillIdx % 26];
+        for (let i = 0; requiredLetters.length < numCones && i < alphabet.length; i++) {
+            const extraChar = alphabet[i];
             if (!requiredLetters.includes(extraChar)) {
                 requiredLetters.push(extraChar);
             }
-            fillIdx++;
+        }
+        // If we still need more letters than the alphabet has, reuse letters cyclically
+        while (requiredLetters.length < numCones) {
+            requiredLetters.push(alphabet[requiredLetters.length % alphabet.length]);
         }
 
         // Shuffle if requested
@@ -289,8 +312,8 @@ BUSHWALK</textarea>
         tableHTML += `</tbody></table>`;
         document.getElementById('coneTableContainer').innerHTML = tableHTML;
 
-        // Render Game Cards
-        let cardsHTML = '';
+        // Render Quiz Sheets: numSheets copies of the full card set, blanks only (no answer words)
+        const cardsHTMLList = [];
         words.forEach((word, idx) => {
             let bearingsArr = [];
             let valid = true;
@@ -306,15 +329,37 @@ BUSHWALK</textarea>
             }
 
             if (valid) {
-                cardsHTML += `<div style="border:1px solid #ccc; padding:10px; margin-bottom:10px; border-radius:4px; background:#fff;">
-                    <strong>Card ${idx + 1}: ${word}</strong><br>
-                    <strong>Bearings:</strong> ${bearingsArr.join(' — ')}<br>
-                    <strong>Letters:</strong> ${word.split('').map(() => '[ ___ ]').join(' ')}
-                </div>`;
+                cardsHTMLList.push({ word, bearingsArr });
             }
         });
 
-        document.getElementById('gameCardsContainer').innerHTML = cardsHTML;
+        let quizSheetsHTML = '';
+        for (let s = 1; s <= numSheets; s++) {
+            quizSheetsHTML += `<div class="quiz-sheet" style="border:2px solid #999; padding:10px; margin-bottom:20px; border-radius:4px;">
+                <h3 style="margin-top:0;">Quiz Sheet ${s} of ${numSheets}</h3>`;
+            cardsHTMLList.forEach((card, idx) => {
+                quizSheetsHTML += `<div class="quiz-card" style="border:1px solid #ccc; padding:10px; margin-bottom:10px; border-radius:4px; background:#fff;">
+                    <strong>Card ${idx + 1}</strong><br>
+                    <strong>Bearings:</strong> ${card.bearingsArr.join(' — ')}<br>
+                    <strong>Letters:</strong> ${card.word.split('').map(() => '[ ___ ]').join(' ')}
+                </div>`;
+            });
+            quizSheetsHTML += `</div>`;
+        }
+
+        document.getElementById('quizSheetsContainer').innerHTML = quizSheetsHTML;
+
+        // Render Solutions sheet: leader only, with answer words filled in
+        let solutionsHTML = '<p style="color:#888;">For the game leader. Each card shows the word, its bearings, and the letters to find.</p>';
+        cardsHTMLList.forEach((card, idx) => {
+            solutionsHTML += `<div class="solution-card" style="border:1px solid #ccc; padding:10px; margin-bottom:10px; border-radius:4px; background:#fff;">
+                <strong>Card ${idx + 1}: ${card.word}</strong><br>
+                <strong>Bearings:</strong> ${card.bearingsArr.join(' — ')}<br>
+                <strong>Letters:</strong> ${card.word.split('').map(l => `[ ${l} ]`).join(' ')}
+            </div>`;
+        });
+
+        document.getElementById('solutionsContainer').innerHTML = solutionsHTML;
         document.getElementById('outputSection').style.display = 'block';
     }
 

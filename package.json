@@ -1,0 +1,9 @@
+{
+  "name": "compass-clock-game",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Compass clock scouting game generator",
+  "scripts": {
+    "test": "node --test"
+  }
+}

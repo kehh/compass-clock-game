@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Compass Clock Scouting Game Generator</title>
+    <style>
+        :root {
+            --primary: #2e7d32;
+            --primary-hover: #1b5e20;
+            --bg-color: #f4f6f8;
+            --card-bg: #ffffff;
+            --text-color: #333333;
+            --border-color: #cccccc;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: var(--card-bg);
+            padding: 25px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        h1, h2 {
+            color: var(--primary);
+            text-align: center;
+        }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .grid-2 {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        input[type="text"], input[type="number"], textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            box-sizing: border-box;
+            font-size: 14px;
+        }
+
+        textarea {
+            height: 120px;
+            resize: vertical;
+        }
+
+        button {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 4px;
+            cursor: pointer;
+            width: 100%;
+            transition: background 0.2s ease;
+        }
+
+        button:hover {
+            background-color: var(--primary-hover);
+        }
+
+        .output-section {
+            margin-top: 30px;
+            border-top: 2px solid var(--border-color);
+            padding-top: 20px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+
+        th, td {
+            border: 1px solid var(--border-color);
+            padding: 10px;
+            text-align: center;
+        }
+
+        th {
+            background-color: #e8f5e9;
+            color: var(--primary);
+        }
+
+        .error-msg {
+            color: #d32f2f;
+            background-color: #ffebee;
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            display: none;
+        }
+
+        .no-print {
+            display: block;
+        }
+
+        @media print {
+            .no-print {
+                display: none;
+            }
+            body {
+                background: none;
+                padding: 0;
+            }
+            .container {
+                box-shadow: none;
+                padding: 0;
+                max-width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>🧭 Compass Clock Game Generator</h1>
+    <p style="text-align: center;">Set up custom bearings, letters, and game cards for your Scout oval navigation game.</p>
+
+    <div class="error-msg" id="errorBox"></div>
+
+    <div class="no-print">
+        <div class="grid-2">
+            <div>
+                <h2>1. Setup Parameters</h2>
+                <div class="form-group">
+                    <label for="numCones">Number of Cones:</label>
+                    <input type="number" id="numCones" value="20" min="4" max="36">
+                </div>
+                <div class="form-group">
+                    <label for="wordList">Target Words (one per line or comma separated):</label>
+                    <textarea id="wordList">ROLEY
+BRAVO
+HATHI
+SMORES
+DILLYBAG
+BUDDY
+AKELA
+MINNAWARRA
+PATROL
+SCOUTS
+BRANCH
+CAMPING
+ASTRAL
+SCOUTING
+BUSHWALK</textarea>
+                </div>
+            </div>
+
+            <div>
+                <h2>2. Cone Letters & Randomization</h2>
+                <div class="form-group">
+                    <label for="customLetters">Specific Letters to Include (Optional, leave blank to auto-extract from words):</label>
+                    <input type="text" id="customLetters" placeholder="e.g. A,B,C,D,E...">
+                </div>
+                <div class="form-group">
+                    <label><input type="checkbox" id="randomizeCones" checked> Randomize Letter Placement around Oval</label>
+                </div>
+                <button onclick="generateGame()">Generate Game Layout & Cards</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="output-section" id="outputSection" style="display:none;">
+        <h2>Cone Layout & Letter Assignments</h2>
+        <p>Each cone is spaced <span id="angleSpacing">18</span>° apart around the oval.</p>
+        <div id="coneTableContainer"></div>
+
+        <h2>Generated Game Cards (Bearings & Solutions)</h2>
+        <div id="gameCardsContainer"></div>
+
+        <button class="no-print" style="margin-top: 20px;" onclick="window.print()">🖨️ Print Game Sheets</button>
+    </div>
+</div>
+
+<script>
+    function generateGame() {
+        const errorBox = document.getElementById('errorBox');
+        errorBox.style.display = 'none';
+        errorBox.innerHTML = '';
+
+        const numCones = parseInt(document.getElementById('numCones').value);
+        const rawWords = document.getElementById('wordList').value;
+        const randomize = document.getElementById('randomizeCones').checked;
+        let customLettersInput = document.getElementById('customLetters').value.toUpperCase().replace(/[^A-Z]/g, '');
+
+        // Parse words
+        const words = rawWords.split(/[
+,]+/).map(w => w.trim().toUpperCase().replace(/[^A-Z]/g, '')).filter(w => w.length > 0);
+
+        if (words.length === 0) {
+            showError("Please enter at least one valid word.");
+            return;
+        }
+
+        // Collect all required unique letters
+        const requiredLettersSet = new Set();
+        words.forEach(w => {
+            for (let char of w) requiredLettersSet.add(char);
+        });
+
+        let requiredLetters = Array.from(requiredLettersSet);
+
+        if (customLettersInput.length > 0) {
+            const customSet = new Set(customLettersInput.split(''));
+            requiredLetters.forEach(l => customSet.add(l));
+            requiredLetters = Array.from(customSet);
+        }
+
+        if (requiredLetters.length > numCones) {
+            showError(`The words require ${requiredLetters.length} unique letters (${requiredLetters.join(', ')}), but you only have ${numCones} cones! Please increase the cone count or use words with fewer unique letters.`);
+            return;
+        }
+
+        // Fill remaining cone slots with extra letters if needed
+        const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        let fillIdx = 0;
+        while (requiredLetters.length < numCones) {
+            let extraChar = alphabet[fillIdx % 26];
+            if (!requiredLetters.includes(extraChar)) {
+                requiredLetters.push(extraChar);
+            }
+            fillIdx++;
+        }
+
+        // Shuffle if requested
+        if (randomize) {
+            requiredLetters = shuffleArray(requiredLetters);
+        }
+
+        // Calculate bearings
+        const angleStep = 360 / numCones;
+        document.getElementById('angleSpacing').innerText = angleStep.toFixed(1);
+
+        const coneMap = {}; // letter -> array of bearings
+        const coneList = [];
+
+        for (let i = 0; i < numCones; i++) {
+            const bearing = Math.round(i * angleStep);
+            const letter = requiredLetters[i];
+            
+            coneList.push({ cone: i + 1, bearing: bearing, letter: letter });
+
+            if (!coneMap[letter]) coneMap[letter] = [];
+            coneMap[letter].push(bearing);
+        }
+
+        // Render Cone Table
+        let tableHTML = `<table><thead><tr><th>Cone #</th><th>Bearing</th><th>Letter</th><th>Cone #</th><th>Bearing</th><th>Letter</th></tr></thead><tbody>`;
+        const half = Math.ceil(numCones / 2);
+        for (let i = 0; i < half; i++) {
+            const c1 = coneList[i];
+            const c2 = coneList[i + half];
+            tableHTML += `<tr>
+                <td><strong>${c1.cone}</strong></td><td>${c1.bearing.toString().padStart(3, '0')}°</td><td><strong>${c1.letter}</strong></td>
+                ${c2 ? `<td><strong>${c2.cone}</strong></td><td>${c2.bearing.toString().padStart(3, '0')}°</td><td><strong>${c2.letter}</strong></td>` : '<td></td><td></td><td></td>'}
+            </tr>`;
+        }
+        tableHTML += `</tbody></table>`;
+        document.getElementById('coneTableContainer').innerHTML = tableHTML;
+
+        // Render Game Cards
+        let cardsHTML = '';
+        words.forEach((word, idx) => {
+            let bearingsArr = [];
+            let valid = true;
+
+            for (let char of word) {
+                if (coneMap[char] && coneMap[char].length > 0) {
+                    // Pick first available bearing for the letter
+                    bearingsArr.push(`${coneMap[char][0].toString().padStart(3, '0')}°`);
+                } else {
+                    valid = false;
+                    break;
+                }
+            }
+
+            if (valid) {
+                cardsHTML += `<div style="border:1px solid #ccc; padding:10px; margin-bottom:10px; border-radius:4px; background:#fff;">
+                    <strong>Card ${idx + 1}: ${word}</strong><br>
+                    <strong>Bearings:</strong> ${bearingsArr.join(' — ')}<br>
+                    <strong>Letters:</strong> ${word.split('').map(() => '[ ___ ]').join(' ')}
+                </div>`;
+            }
+        });
+
+        document.getElementById('gameCardsContainer').innerHTML = cardsHTML;
+        document.getElementById('outputSection').style.display = 'block';
+    }
+
+    function showError(msg) {
+        const errorBox = document.getElementById('errorBox');
+        errorBox.innerHTML = msg;
+        errorBox.style.display = 'block';
+    }
+
+    function shuffleArray(array) {
+        let arr = array.slice();
+        for (let i = arr.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [arr[i], arr[j]] = [arr[j], arr[i]];
+        }
+        return arr;
+    }
+</script>
+
+</body>
+</html>

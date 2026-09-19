@@ -136,6 +136,15 @@ test('print styles start each quiz sheet copy on a new page', () => {
   assert.ok(printBlock.includes('.quiz-sheet + .quiz-sheet'), 'print CSS must target quiz sheets after the first');
 });
 
+test('head declares a compass emoji favicon as an inline SVG data URI', () => {
+  const source = fs.readFileSync(HTML_PATH, 'utf8');
+  const head = source.match(/<head>([\s\S]*?)<\/head>/)[1];
+  const match = head.match(/<link[^>]*rel="icon"[^>]*>/);
+  assert.ok(match, 'favicon link must be declared in the head');
+  assert.ok(match[0].includes('image/svg+xml'), 'favicon must be an SVG data URI');
+  assert.ok(match[0].includes(encodeURIComponent('\u{1F9ED}')) || match[0].includes('\u{1F9ED}'), 'favicon must render a compass emoji');
+});
+
 test('36 cones completes without hanging and with no error', () => {
   setup({ numCones: '36' });
   generateGame();
